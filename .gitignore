@@ -1,5 +1,8 @@
 # Environment files with secrets
 .env
+credentials.txt
+*.credentials
+*.secret
 
 # Cloned repositories (users should clone these themselves)
 /1100CC/
