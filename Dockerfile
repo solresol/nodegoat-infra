@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     cmake \
     git \
     unzip \
+    gettext-base \
     # Apache/PHP dependencies
     libapache2-mod-fcgid \
     # PHP extension dependencies
