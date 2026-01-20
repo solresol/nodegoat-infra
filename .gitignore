@@ -1,0 +1,22 @@
+# Environment files with secrets
+.env
+
+# Cloned repositories (users should clone these themselves)
+/1100CC/
+/nodegoat/
+
+# Runtime configuration with passwords
+/config/safe/
+
+# Docker volumes (if using bind mounts)
+/data/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

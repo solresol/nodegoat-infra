@@ -1,0 +1,26 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+LICENSE
+
+# Environment files
+.env
+.env.*
+
+# IDE files
+.idea/
+.vscode/
+
+# Cloned repositories (mounted separately)
+1100CC/
+nodegoat/
+
+# Docker files not needed in build context
+docker-compose*.yml
+
+# OS files
+.DS_Store
+Thumbs.db
