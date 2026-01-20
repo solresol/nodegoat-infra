@@ -23,48 +23,21 @@ services:
       - ./config/safe:/var/1100CC/SAFE
       - ./config/alias:/var/1100CC/APP/alias
     environment:
-      - DB_TYPE=${DB_TYPE:-mysql}
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-3306}
-      - DB_NAME_1100CC=${DB_NAME_1100CC:-1100CC}
+      - DB_TYPE=${DB_TYPE:-pgsql}
+      - DB_HOST=${DB_HOST:-172.17.0.1}
+      - DB_PORT=${DB_PORT:-5432}
       - DB_NAME_CMS=${DB_NAME_CMS:-nodegoat_cms}
       - DB_NAME_HOME=${DB_NAME_HOME:-nodegoat_home}
       - DB_NAME_CONTENT=${DB_NAME_CONTENT:-nodegoat_content}
       - DB_NAME_TEMP=${DB_NAME_TEMP:-nodegoat_temp}
-      - DB_USER_CMS=${DB_USER_CMS:-1100CC_cms}
-      - DB_USER_HOME=${DB_USER_HOME:-1100CC_home}
-      - DB_PASSWORD_CMS=${DB_PASSWORD_CMS:-changeme_cms}
-      - DB_PASSWORD_HOME=${DB_PASSWORD_HOME:-changeme_home}
+      - DB_USER_CMS=${DB_USER_CMS:-nodegoat_cms}
+      - DB_USER_HOME=${DB_USER_HOME:-nodegoat_home}
+      - DB_PASSWORD_CMS=${DB_PASSWORD_CMS}
+      - DB_PASSWORD_HOME=${DB_PASSWORD_HOME}
       - NODEGOAT_DOMAIN=${NODEGOAT_DOMAIN:-localhost}
       - NODEGOAT_CMS_DOMAIN=${NODEGOAT_CMS_DOMAIN:-cms.localhost}
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - nodegoat-network
-
-  db:
-    image: mysql:8.0
-    container_name: nodegoat-db
-    restart: unless-stopped
-    ports:
-      - "${DB_EXTERNAL_PORT:-3306}:3306"
-    volumes:
-      - nodegoat-db-data:/var/lib/mysql
-      - ./db/init:/docker-entrypoint-initdb.d:ro
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
-      - MYSQL_DATABASE=${DB_NAME_1100CC:-1100CC}
-    command: >
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --default-authentication-plugin=mysql_native_password
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - nodegoat-network
 
@@ -72,8 +45,6 @@ volumes:
   nodegoat-storage:
     driver: local
   nodegoat-cache:
-    driver: local
-  nodegoat-db-data:
     driver: local
 
 networks:

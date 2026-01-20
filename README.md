@@ -10,9 +10,16 @@ Source repository: https://github.com/nodegoat/nodegoat
 
 NodeGoat runs on the 1100CC framework: https://github.com/LAB1100/1100CC
 
+## Architecture
+
+This setup uses:
+- **Docker** for the PHP/Apache web application
+- **Host PostgreSQL** with PostGIS for the database (not containerized)
+
 ## Prerequisites
 
 - Docker and Docker Compose installed
+- PostgreSQL 16+ with PostGIS extension on the host
 - Git for cloning repositories
 
 ## Quick Start
@@ -33,11 +40,10 @@ git clone https://github.com/nodegoat/nodegoat.git
 # Copy the example environment file
 cp .env.example .env
 
-# Edit .env and set your passwords and domain
-# IMPORTANT: Change the default passwords for production use!
+# Edit .env and set your database passwords
 ```
 
-### 3. Start the containers
+### 3. Start the container
 
 ```bash
 docker-compose up -d
@@ -45,15 +51,15 @@ docker-compose up -d
 
 ### 4. Import database schemas
 
-After the containers are running, import the SQL schema files:
+After the container is running, import the SQL schema files:
 
 ```bash
-# Import 1100CC core schema
-docker exec -i nodegoat-db mysql -uroot -p$MYSQL_ROOT_PASSWORD 1100CC < ./1100CC/setup/1100CC.sql
+# Import 1100CC core schemas (check ./1100CC/setup/ for all SQL files)
+psql -U nodegoat_cms -h localhost -d nodegoat_cms -f ./1100CC/setup/1100CC.sql
 
-# Import NodeGoat schemas (check the nodegoat/setup directory for all required files)
-docker exec -i nodegoat-db mysql -uroot -p$MYSQL_ROOT_PASSWORD nodegoat_cms < ./nodegoat/setup/nodegoat_cms.sql
-docker exec -i nodegoat-db mysql -uroot -p$MYSQL_ROOT_PASSWORD nodegoat_content < ./nodegoat/setup/nodegoat_content.sql
+# Import NodeGoat schemas (check ./nodegoat/setup/ for all SQL files)
+psql -U nodegoat_cms -h localhost -d nodegoat_cms -f ./nodegoat/setup/nodegoat_cms.sql
+psql -U nodegoat_cms -h localhost -d nodegoat_content -f ./nodegoat/setup/nodegoat_content.sql
 # ... import other SQL files as needed
 ```
 
@@ -67,7 +73,7 @@ docker exec -i nodegoat-db mysql -uroot -p$MYSQL_ROOT_PASSWORD nodegoat_content 
 ```
 nodegoat-infra/
 ├── Dockerfile              # Main container image
-├── docker-compose.yml      # Service orchestration
+├── docker-compose.yml      # Service orchestration (web only)
 ├── .env.example            # Environment template
 ├── apache/
 │   └── nodegoat.conf       # Apache virtual host config
@@ -75,8 +81,6 @@ nodegoat-infra/
 │   └── php.ini             # PHP configuration
 ├── scripts/
 │   └── entrypoint.sh       # Container startup script
-├── db/
-│   └── init/               # Database initialization scripts
 ├── config/
 │   ├── settings/           # 1100CC settings (mount point)
 │   └── safe/               # Database passwords (mount point)
@@ -94,29 +98,42 @@ nodegoat-infra/
 | `NODEGOAT_HTTPS_PORT` | 8443 | HTTPS port mapping |
 | `NODEGOAT_DOMAIN` | localhost | Main domain |
 | `NODEGOAT_CMS_DOMAIN` | cms.localhost | CMS subdomain |
-| `DB_TYPE` | mysql | Database type (mysql or pgsql) |
-| `DB_HOST` | db | Database host |
-| `DB_PORT` | 3306 | Database port |
-| `MYSQL_ROOT_PASSWORD` | rootpassword | MySQL root password |
-| `DB_PASSWORD_CMS` | changeme_cms | CMS user password |
-| `DB_PASSWORD_HOME` | changeme_home | Home user password |
+| `DB_TYPE` | pgsql | Database type |
+| `DB_HOST` | 172.17.0.1 | Database host (Docker bridge IP) |
+| `DB_PORT` | 5432 | Database port |
+| `DB_PASSWORD_CMS` | (required) | CMS user password |
+| `DB_PASSWORD_HOME` | (required) | Home user password |
 
-### Database Users
+### Database Setup
 
-The setup creates two MySQL users with different privilege levels:
+The following PostgreSQL databases are required:
+- `nodegoat_cms` - CMS/admin data
+- `nodegoat_home` - Public interface data
+- `nodegoat_content` - Content data (with PostGIS)
+- `nodegoat_temp` - Temporary data (with PostGIS)
 
-- **1100CC_cms**: Full CRUD + schema modification (for CMS/admin)
-- **1100CC_home**: Read/write access (for public interface)
+Two database users with different privilege levels:
+- **nodegoat_cms**: Full CRUD + schema modification (for CMS/admin)
+- **nodegoat_home**: Read/write access (for public interface)
 
-## PostgreSQL Alternative
+### PostgreSQL Configuration
 
-To use PostgreSQL with PostGIS instead of MySQL:
+For Docker containers to connect to host PostgreSQL:
 
-1. Update `docker-compose.yml` to use the PostgreSQL service
-2. Set `DB_TYPE=pgsql` in `.env`
-3. Enable PostGIS extension in the database
+1. Add to `/etc/postgresql/16/main/pg_hba.conf`:
+   ```
+   host    all    all    172.17.0.0/16    scram-sha-256
+   ```
 
-A PostgreSQL compose override is available in `docker-compose.postgres.yml`.
+2. Update `/etc/postgresql/16/main/postgresql.conf`:
+   ```
+   listen_addresses = 'localhost,172.17.0.1'
+   ```
+
+3. Restart PostgreSQL:
+   ```bash
+   sudo systemctl restart postgresql
+   ```
 
 ## Volumes
 
@@ -124,7 +141,6 @@ The following Docker volumes persist data:
 
 - `nodegoat-storage`: Uploaded files and media
 - `nodegoat-cache`: Application cache
-- `nodegoat-db-data`: Database files
 
 ## Useful Commands
 
@@ -135,8 +151,8 @@ docker-compose logs -f nodegoat
 # Access container shell
 docker exec -it nodegoat-app bash
 
-# Access MySQL shell
-docker exec -it nodegoat-db mysql -uroot -p
+# Access PostgreSQL shell
+psql -U nodegoat_cms -h localhost -d nodegoat_cms
 
 # Rebuild after changes
 docker-compose build --no-cache
@@ -144,16 +160,16 @@ docker-compose build --no-cache
 # Stop and remove containers
 docker-compose down
 
-# Stop and remove containers + volumes (WARNING: deletes data)
+# Stop and remove containers + volumes (WARNING: deletes uploaded files)
 docker-compose down -v
 ```
 
 ## Troubleshooting
 
 ### Database connection errors
-- Ensure the database container is healthy: `docker-compose ps`
-- Check logs: `docker-compose logs db`
-- Verify passwords match between `.env` and the init script
+- Verify PostgreSQL is listening on Docker bridge: `ss -tlnp | grep 5432`
+- Check pg_hba.conf allows connections from 172.17.0.0/16
+- Test connection from container: `docker exec nodegoat-app psql -h 172.17.0.1 -U nodegoat_cms -d nodegoat_cms`
 
 ### 1100CC/NodeGoat not loading
 - Verify the repositories are cloned to the correct locations
@@ -164,6 +180,14 @@ docker-compose down -v
   ```bash
   docker exec nodegoat-app chown -R www-data:www-data /var/1100CC/APP/STORAGE
   ```
+
+## Alternative: Fully Containerized Setup
+
+If you prefer to run PostgreSQL in Docker as well, use the `docker-compose.postgres.yml` override:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+```
 
 ## References
 
