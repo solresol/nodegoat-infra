@@ -7,6 +7,9 @@ services:
       dockerfile: Dockerfile
     container_name: nodegoat-app
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "${NODEGOAT_HTTP_PORT:-8080}:80"
       - "${NODEGOAT_HTTPS_PORT:-8443}:443"
@@ -18,8 +21,8 @@ services:
       - ./nodegoat/APP/nodegoat:/var/1100CC/APP/nodegoat:ro
       # NodeGoat settings (writable)
       - ./config/settings/nodegoat:/var/1100CC/APP/SETTINGS/nodegoat
-      # Persistent storage for nodegoat site
-      - nodegoat-storage:/var/1100CC/APP/STORAGE/nodegoat
+      # NodeGoat site storage (CSS templates etc)
+      - ./nodegoat/APP/STORAGE/nodegoat:/var/1100CC/APP/STORAGE/nodegoat
       # Cache (writable)
       - nodegoat-cache:/var/1100CC/APP/CACHE
       # Database passwords
@@ -29,28 +32,50 @@ services:
       # 1100CC PROGRAMS directory (for any compiled services)
       - ./1100CC/PROGRAMS:/var/1100CC/PROGRAMS:ro
     environment:
-      - DB_TYPE=${DB_TYPE:-pgsql}
-      - DB_HOST=${DB_HOST:-172.17.0.1}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_NAME_CMS=${DB_NAME_CMS:-nodegoat_cms}
-      - DB_NAME_HOME=${DB_NAME_HOME:-nodegoat_home}
-      - DB_NAME_CONTENT=${DB_NAME_CONTENT:-nodegoat_content}
-      - DB_NAME_TEMP=${DB_NAME_TEMP:-nodegoat_temp}
-      - DB_USER_CMS=${DB_USER_CMS:-nodegoat_cms}
-      - DB_USER_HOME=${DB_USER_HOME:-nodegoat_home}
-      - DB_PASSWORD_CMS=${DB_PASSWORD_CMS}
-      - DB_PASSWORD_HOME=${DB_PASSWORD_HOME}
-      - NODEGOAT_DOMAIN=${NODEGOAT_DOMAIN:-localhost}
-      - NODEGOAT_CMS_DOMAIN=${NODEGOAT_CMS_DOMAIN:-cms.localhost}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - DB_TYPE=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_NAME_CMS=nodegoat_cms
+      - DB_NAME_HOME=nodegoat_home
+      - DB_NAME_CONTENT=nodegoat_content
+      - DB_NAME_TEMP=nodegoat_temp
+      - DB_USER_CMS=1100CC_cms
+      - DB_USER_HOME=1100CC_home
+      - DB_PASSWORD_CMS=${DB_PASSWORD_CMS:-changeme_cms}
+      - DB_PASSWORD_HOME=${DB_PASSWORD_HOME:-changeme_home}
+      - NODEGOAT_DOMAIN=${NODEGOAT_DOMAIN:-nodegoat.local}
+      - NODEGOAT_CMS_DOMAIN=${NODEGOAT_CMS_DOMAIN:-cms.nodegoat.local}
+    networks:
+      - nodegoat-network
+
+  db:
+    image: mariadb:11.4
+    container_name: nodegoat-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-changeme_root}
+      - MYSQL_PASSWORD_CMS=${DB_PASSWORD_CMS:-changeme_cms}
+      - MYSQL_PASSWORD_HOME=${DB_PASSWORD_HOME:-changeme_home}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./1100CC/setup:/setup/1100CC:ro
+      - ./nodegoat/setup:/setup/nodegoat:ro
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - nodegoat-network
 
 volumes:
-  nodegoat-storage:
-    driver: local
   nodegoat-cache:
+    driver: local
+  mysql-data:
     driver: local
 
 networks:

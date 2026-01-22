@@ -23,38 +23,36 @@ chown -R www-data:www-data /var/1100CC/APP/CACHE
 chmod -R 775 /var/1100CC/APP/STORAGE
 chmod -R 775 /var/1100CC/APP/CACHE
 
-# Create password files in SAFE directory if they don't exist
+# Create/update password files in SAFE directory
 SAFE_DIR="/var/1100CC/SAFE/nodegoat"
 mkdir -p "$SAFE_DIR"
 
-if [ ! -f "$SAFE_DIR/cms" ]; then
-    echo "Creating CMS database password file..."
-    echo "${DB_PASSWORD_CMS:-changeme_cms}" > "$SAFE_DIR/cms"
-    chmod 600 "$SAFE_DIR/cms"
-fi
+# Always update password files to ensure they match environment variables
+echo "Updating CMS database password file..."
+echo -n "${DB_PASSWORD_CMS:-changeme_cms}" > "$SAFE_DIR/cms"
+chmod 600 "$SAFE_DIR/cms"
 
-if [ ! -f "$SAFE_DIR/home" ]; then
-    echo "Creating HOME database password file..."
-    echo "${DB_PASSWORD_HOME:-changeme_home}" > "$SAFE_DIR/home"
-    chmod 600 "$SAFE_DIR/home"
-fi
+echo "Updating HOME database password file..."
+echo -n "${DB_PASSWORD_HOME:-changeme_home}" > "$SAFE_DIR/home"
+chmod 600 "$SAFE_DIR/home"
 
 chown -R www-data:www-data /var/1100CC/SAFE
 
 # Wait for database to be ready
-echo "Waiting for database connection..."
+echo "Waiting for database connection (${DB_TYPE:-mysql})..."
 MAX_RETRIES=30
 RETRY_COUNT=0
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     if [ "${DB_TYPE}" = "pgsql" ]; then
-        if pg_isready -h "${DB_HOST}" -p "${DB_PORT:-5432}" > /dev/null 2>&1; then
+        if pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" > /dev/null 2>&1; then
             echo "PostgreSQL is ready!"
             break
         fi
     else
-        if mysqladmin ping -h "${DB_HOST}" -P "${DB_PORT:-3306}" --silent 2>/dev/null; then
-            echo "MySQL is ready!"
+        # MySQL/MariaDB
+        if mysqladmin ping -h "${DB_HOST:-db}" -P "${DB_PORT:-3306}" --silent 2>/dev/null; then
+            echo "MySQL/MariaDB is ready!"
             break
         fi
     fi
@@ -66,6 +64,7 @@ done
 
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
     echo "WARNING: Could not connect to database after $MAX_RETRIES attempts"
+    echo "The application may fail to start. Check database connectivity."
 fi
 
 # Check if 1100CC core is mounted
