@@ -1,2 +1,2 @@
-localhost	nodegoat
-cms.localhost	nodegoat
+nodegoat.local nodegoat
+cms.nodegoat.local nodegoat

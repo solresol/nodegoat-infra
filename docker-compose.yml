@@ -11,17 +11,23 @@ services:
       - "${NODEGOAT_HTTP_PORT:-8080}:80"
       - "${NODEGOAT_HTTPS_PORT:-8443}:443"
     volumes:
-      # 1100CC framework (clone from https://github.com/LAB1100/1100CC)
-      - ./1100CC:/var/1100CC/APP/CORE:ro
-      # NodeGoat application (clone from https://github.com/nodegoat/nodegoat)
-      - ./nodegoat:/var/1100CC/APP/nodegoat:ro
-      # Persistent storage
-      - nodegoat-storage:/var/1100CC/APP/STORAGE
+      # 1100CC framework APP directory (the document root)
+      # Note: not read-only because we need nested mounts inside it
+      - ./1100CC/APP:/var/1100CC/APP
+      # NodeGoat site code (mounted into 1100CC APP)
+      - ./nodegoat/APP/nodegoat:/var/1100CC/APP/nodegoat:ro
+      # NodeGoat settings (writable)
+      - ./config/settings/nodegoat:/var/1100CC/APP/SETTINGS/nodegoat
+      # Persistent storage for nodegoat site
+      - nodegoat-storage:/var/1100CC/APP/STORAGE/nodegoat
+      # Cache (writable)
       - nodegoat-cache:/var/1100CC/APP/CACHE
-      # Configuration (you need to create these)
-      - ./config/settings:/var/1100CC/APP/SETTINGS
+      # Database passwords
       - ./config/safe:/var/1100CC/SAFE
+      # Host alias file (override the one in 1100CC/APP)
       - ./config/alias:/var/1100CC/APP/alias
+      # 1100CC PROGRAMS directory (for any compiled services)
+      - ./1100CC/PROGRAMS:/var/1100CC/PROGRAMS:ro
     environment:
       - DB_TYPE=${DB_TYPE:-pgsql}
       - DB_HOST=${DB_HOST:-172.17.0.1}
