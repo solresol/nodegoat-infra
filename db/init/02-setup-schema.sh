@@ -105,6 +105,8 @@ mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" nodegoat_cms <<EOF
 INSERT IGNORE INTO site_details_hosts (name) VALUES ('nodegoat.local');
 INSERT IGNORE INTO site_details_hosts (name) VALUES ('cms.nodegoat.local');
 INSERT IGNORE INTO site_details_hosts (name) VALUES ('localhost');
+INSERT IGNORE INTO site_details_hosts (name) VALUES ('nodegoat.symmachus.org');
+INSERT IGNORE INTO site_details_hosts (name) VALUES ('cms.nodegoat.symmachus.org');
 EOF
 
 echo "=== NodeGoat Database Setup Complete ==="
